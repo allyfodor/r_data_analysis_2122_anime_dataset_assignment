@@ -57,64 +57,80 @@ What a smart cat! I wish he would have this level of enthusiasm when it comes to
 
 He made a multiple regression model to analyze his question. 
 The outcome variable was the score of all the anime on MyAnimeList.
-He wanted to see how the number of people scoring an anime affects its overall score, but also considered a few other variables that might add significantly to the outcome.
+He wanted to see how the number of people scoring an anime affects its overall score, but also considered the number of favorites that might add significantly to the outcome.
 
 So the predictors were:
 
-* Members (how many users saved an anime on their list)
 * Favorites (how many users marked an anime as their favorite)
 * Scored_by (how many users scored an anime)
 
 **The sample size was N=13628**
 
 ```{r}
-score_by_members_favourites_scored_by_lm = lm(score ~  members + favorites + scored_by, data = anime_data_distinct_by_name)
+#We need positive numbers as predictors for log function.
+anime_data_with_positive_scores_favorites_scored_by= anime_data_distinct_by_name %>% 
+  filter(
+    !is.na(score),
+    score>0,
+    !is.na(favorites),
+    favorites>0, 
+    !is.na(scored_by),
+    scored_by>0)
+score_by_favourites_and_scored_by_lm = lm(score ~ log(favorites) + log(scored_by), anime_data_with_positive_scores_favorites_scored_by)
 ```
 
 ### Assumptions testing ###
 
 ```{r}
-check_model(score_by_members_favourites_scored_by_lm,check="linearity")
+check_model(score_by_favourites_and_scored_by_lm,check="linearity")
 ```
 
-> According to the plot, there might be a problem with the assumption of Linearity.
+> Maci had to transform the predictors, since the assumption of linearity was problematic with the original data.
+After the logarithmic transformation, the assumption of linearity seems acceptable.
 
 ```{r}
-check_model(score_by_members_favourites_scored_by_lm,check="homogeneity")
+check_model(score_by_favourites_and_scored_by_lm,check="homogeneity")
 ```
 
-> According to the plot, there might be a problem with the assumption of homoskedasticity, since the residuals are not quite randomly scattered, therefore they do not provide a relatively even distribution,
+> According to the plot, there might be a problem with the assumption of homoskedasticity, 
+since the reference line is not perfectly flat and horizontal.
+
 
 ```{r}
-check_model(score_by_members_favourites_scored_by_lm,check="vif")
+check_model(score_by_favourites_and_scored_by_lm,check="vif")
 ```
 
-> According to the plot, the VIF statistics are not causing issues, since they are all smaller than 5.
+> In the original model (the one with 3 predictors) the assumption of multicollinearity was violated,
+the VIF value of the Members and the Scored by variable was above 10. So the members variable was removed.
+According to the plot, the VIF statistics are not causing issues now, since they are all smaller than 5.
 
 ```{r}
-check_model(score_by_members_favourites_scored_by_lm,check="outliers")
+check_model(score_by_favourites_and_scored_by_lm,check="outliers")
 ```
 
 > According to the plot, there are no relevant outliers in the dataset.
 ```{r}
-check_model(score_by_members_favourites_scored_by_lm,check=c("qq","normality"))
+check_model(score_by_favourites_and_scored_by_lm,check=c("qq","normality"))
 ```
 
-> According to the plot,the normality of residuals is met. There is only a small deviation from the reference. On the first plot, the residuals do not perfectly fit to the reference, and second plot shows, that our data is slightly left skewed.
+> According to the plot, the assumption of the normality of residuals might be violated.
+  On the first plot, the residuals are far from fitting the reference line.
+  THe second plot shows, that our data is slightly left skewed, and also leptokurtic.
+  The solution to this issue could be bootstrapping or applying stricter criteria for significance levels
+  (accepting significance levels below .01, instead of .05).
 
 ```{r}
-summary(score_by_members_favourites_scored_by_lm)
+summary(score_by_favourites_and_scored_by_lm)
 ```
 ### Regression analysis ###
-The F test indicates that our model provides a better fit than the baseline model (F(3, 13512)= 1130, p<0.001).
-According to the analysis, 20% of the dependent variable (Overall scores of anime) can be explained by the independent variables (Adj.R^2=0.2).
+The F test indicates that our model provides a better fit than the baseline model (F(2,8394)= 3419, p<0.001).
+According to the analysis, 44,9% of the dependent variable (Overall scores of anime) can be explained by the independent variables (Adj.R^2=0.449).
 
 ### The predictors ###
-There is a 2.053e-05 increase in the score of an anime on MyAnimeList for each extra member saving it on their list (t=32.80, B=2.053e-05, p<0.001).
-There is a -5.621e-05 decrease in the score of an anime on MyAnimeList for each extra member marking it as their favorite (t=-12.16, B=-5.621e-05, p<0,001).
-There is a -2.499e-05 decrease in the score of an anime on MyAnimeList for each extra member scoring it (t=-22.08, B=-2.499e-05, p<0.001).
+There is is 0.002 point increase inthe score of an anime on MyAnimeList for each extra 1% member marking it as their favorite (t=33.59, ß=0.2, p<0.001)
+One percent increase in the members scoring an anime would result a 0.00047 point increase in the overall score of the anime (t=7.54, ß0.047, p<0.001).
 
-**So, the number of members scoring an anime on MyAnimeList has a significant negative (but only a minor) effect on the overall score on the anime, after controlling the number of the members interacting with the product in other ways (such as saving it on their list or marking it as their favorite)**
+**So, the number of members scoring an anime on MyAnimeList has a significant positive (but only a minor) effect on the overall score on the anime, after controlling the number of the members interacting with the product in other ways (such as marking it as their favorite)**
 
 ## Second analysis ##
 
@@ -149,14 +165,13 @@ score_by_source_and_rating_lm = lm(score ~ source + rating, data = manga_based_a
 check_model(score_by_source_and_rating_lm,check="linearity")
 ```
 
-> There might be some problems with the linearity since the there is a curve on the plot.
+> Since the variables in the analysis are both binary, dummy variables, there is no need to evaluate this assumption (they meet it by definition).
 
 ```{r}
 check_model(score_by_source_and_rating_lm,check="homogeneity")
 ```
 
-> According to the plot, there might be a problem with the assumption of homoskedasticity, since the 
-> residuals are not randomly scattered, therefore they do not provide a relatively even distribution.
+> Since the variables in the analysis are both binary, dummy variables, the assumption is met.
 
 ```{r}
 check_model(score_by_source_and_rating_lm,check="vif")
@@ -175,11 +190,14 @@ check_model(score_by_source_and_rating_lm,check="outliers")
 check_model(score_by_source_and_rating_lm,check=c("qq","normality"))
 ```
 
-> According to the plot, the assumption of the normality of residuals is met. There is only a small deviation from the reference. 
-> On the first plot, the residuals do not perfectly fit to the reference line, but there is only an insignificant difference, and the second plot shows, that our data is slightly left skewed.
+> According to the plot, the assumption of the normality of residuals might be violated.
+  On the first plot, the residuals are far from fitting the reference line.
+  THe second plot shows, that our data is slightly left skewed, and also leptokurtic.
+  The solution to this issue could be bootstrapping or applying stricter criteria for significance levels
+  (accepting significance levels below .01, instead of .05).
 
 ```{r}
-summary(score_by_members_favourites_scored_by_lm)
+summary(score_by_source_and_rating_lm)
 ```
 
 ### Regression analysis ###
@@ -187,8 +205,8 @@ The F test indicates that our model provides a better fit than the baseline mode
 According to the analysis, 8% of the dependent variable (Overall scores of anime) can be explained by the independent variables (Adj.R^2=0.86).
 
 ### The predictors ###
-If an anime is an original one, its score is 0.56 less than a manga adaptation (t=-17.639, B=-0.56, p<0.0.001).
-The rating of anime was not significant (t=1.503, B=0.06, p=0.133).
+If an anime is an original one, its score is 0.56 less than a manga adaptation (t=-17.639, ß=-0.56, p<0.0.001).
+The rating of anime was not significant (t=1.503, ß=0.06, p=0.133).
 
 **So, it would be more beneficial for Maci to choose a manga and adapt it to anime, rather than creating an original story.**
 
@@ -280,3 +298,7 @@ anime - playing smart and riding the wave of popularity, while creating a new ma
 in a genre that haven't seen one in the recent decades.
 
 *Despite his outstanding ideas and enthusiasm, he still does not show any intention of paying rent.*
+
+```{r pressure, echo=FALSE, fig.cap="Maci pondering his idea", out.width = '100%'}
+knitr::include_graphics("maci.jpg")
+```
